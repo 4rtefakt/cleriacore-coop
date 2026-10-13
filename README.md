@@ -47,7 +47,7 @@ room (or use *Go to ...*), and you are together. Rooms you are not sharing are y
   (the item, the opened chest, the unlocked door, the beaten boss) to the others' saves; it does not replay the
   scene. A door a teammate unlocked is open for you the next time you enter the room.
 - A teammate's skills and swings show their effects, but not sword trails, Hugo's shots and eyes, or the charge
-  glow; a monster killed by another player just disappears from your screen.
+  glow.
 - No lobby, no password, no encryption: play with people you know.
 
 ## How it works
@@ -77,10 +77,11 @@ its own script, and checks both outputs:
 | `effects` | The host casts his fire skill; the guest's game shows its flames on his puppet (the picture above) |
 | `progress` | With shared progress on both sides, an item the host obtains and a door flag he sets arrive in the guest's game |
 | `tougher` | A room entered with two players connected is built with 1.6 times the HP (86 to 137), on both screens |
+| `three` | Host and two guests: everybody sees the two others, and a guest's chat line reaches the other guest through the host |
 | `friendly_fire` | With the rule on both sides, the host's swing on the guest's puppet hurts the guest |
 | `apart` | In different rooms nobody is drawn and each player owns their room |
 
-Not tested: more than two players, two machines on a real network, a long session, a real chest or boss flag
+Not tested: more than three players, two machines on a real network, a long session, a real chest or boss flag
 through shared progress (the cases send an item and a door flag by command).
 
 ## About

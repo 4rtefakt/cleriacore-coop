@@ -190,6 +190,16 @@ CASES = {
              drive=";".join(f"{t}:shot" for t in range(2000, 12000, 37)) + ";12000:quit",
              expect=[LP + "connected as 2", LP + "effect ", " on Hosty"], shots={f"fx{t}": t for t in range(2000, 12000, 37)}),
     ]),
+    # Three players: the two guests know each other only through the host, who passes their messages on.
+    "three": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009", drive=every(3000, 60000, 3000, "lua=coop status") + ";60000:quit",
+             expect=[LP + "hosting on ", "peers 2 here 2 puppets 2"]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009", drive=every(3000, 40000, 3000, "lua=coop status") + ";40000:quit",
+             expect=[LP + "connected as ", "peers 2 here 2 puppets 2", LP + "chat Thirdy: hello you two"]),
+        dict(name="Thirdy", auto="join", room="S_10/S_1009/S_1009", char="3",
+             drive=every(3000, 40000, 3000, "lua=coop status") + ";" + every(8000, 40000, 4000, "lua=coop say hello you two") + ";40000:quit",
+             expect=[LP + "connected as ", "peers 2 here 2 puppets 2"]),
+    ]),
     # The README's pictures: the host (Hugo) walks off and swings; the guest's screen shows him, his name, the monsters.
     "picture": dict(sides=[
         dict(name="Hosty", auto="host", room=ROOM, char="2",
