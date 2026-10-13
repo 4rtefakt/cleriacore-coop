@@ -12,8 +12,9 @@
 --   kill    the owner's kill: its EXP and SP for everybody in the room
 --   hit     a swing of mine landed on your puppet (friendly fire)
 --   item / flag   shared progress: an item obtained, a chest / door / boss flag
+--   fx      an effect my character's script made (a skill's blast): shown on my puppet, hitting nobody
 --   chat    a line of text
-if not (cleria.net and cleria.net.tcp and cleria.world and cleria.world.puppet and cleria.combat.boss_bonus) then
+if not (cleria.net and cleria.net.tcp and cleria.world and cleria.world.puppet_effect and cleria.combat.boss_bonus) then
     cleria.log("Co-op needs a CleriaCore with mod API 7")
     return
 end
@@ -317,6 +318,12 @@ handle = function(m)
             told[m.flag] = true
             if G.flag(m.flag) == 0 then G.set_flag(m.flag, 1) say("shared " .. tostring(m.k) .. " flag " .. m.flag) end
         end
+    elseif t == "fx" then
+        local p = peers[m.from]
+        if p and p.puppet and p.room == room() and type(m.e) == "table" then
+            W.puppet_effect(p.puppet, m.e)
+            if not p.fx_seen then p.fx_seen = true say("effect " .. tostring(m.e.id) .. " on " .. p.name) end
+        end
     elseif t == "bosswon" then
         if cfg.monsters and m.r == room() then boss_won = m.r say("a teammate beat the boss") end
     elseif t == "chat" then
@@ -426,6 +433,11 @@ end)
 cleria.events.on("enemy_killed", function(e)
     if role and me and cfg.rewards and others_here() > 0 and owner_of(room()) == me then
         send({t = "kill", r = room(), exp = e.exp, sp = e.sp})
+    end
+end)
+cleria.events.on("player_effect", function(e)          -- my skill's blast, my swing's flash: the others show it on my puppet
+    if role and me and others_here() > 0 then
+        send({t = "fx", e = {id = e.id, fwd = r2(e.fwd), angle = r2(e.angle), voff = r2(e.voff), scale = r2(e.scale), attach = e.attach}})
     end
 end)
 cleria.events.on("puppet_struck", function(e)          -- my monster hit another player on my screen

@@ -180,6 +180,16 @@ CASES = {
              drive="12000:lua=coop follow;" + every(14000, 60000, 3000, "lua=coop status") + ";60000:quit",
              expect=[LP + "connected as 2", LP + "following to S_1002", "held true owner 1 first hp 137/137 room S_1002"]),
     ]),
+    # The host casts his fire skill again and again; the guest's game shows the skill's effects on his puppet.
+    "effects": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009",
+             drive="5:opt=InfiniteMP=1;8:bracelet=118;9:flag=118,1;10:flag=184,1;2000:move=1,0,60;" +
+                   ";".join(f"{t}:skill+;{t + 2}:skill-" for t in range(2500, 150000, 120)) + ";150000:quit",
+             expect=[LP + "Guesty joined (2)"]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
+             drive=";".join(f"{t}:shot" for t in range(2000, 12000, 37)) + ";12000:quit",
+             expect=[LP + "connected as 2", LP + "effect ", " on Hosty"], shots={f"fx{t}": t for t in range(2000, 12000, 37)}),
+    ]),
     # The README's pictures: the host (Hugo) walks off and swings; the guest's screen shows him, his name, the monsters.
     "picture": dict(sides=[
         dict(name="Hosty", auto="host", room=ROOM, char="2",

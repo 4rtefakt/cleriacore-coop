@@ -2,7 +2,7 @@
 
 Play **Ys Origin** with friends on CleriaCore: one player hosts, the others join.
 
-![The guest's screen: the host's Hugo beside her, his name and HP over him](docs/guest.png)
+![The guest's screen: the host casting his fire skill, his name over him, the party list at the top right](docs/skill.png)
 
 It needs a CleriaCore with **mod API 7**, which is not in a released build yet (branch `feat/mod-api-7`).
 
@@ -46,8 +46,8 @@ room (or use *Go to ...*), and you are together. Rooms you are not sharing are y
 - **Room scripts, chests, doors, switches and drops are each player's own.** *Shared progress* copies the outcome
   (the item, the opened chest, the unlocked door, the beaten boss) to the others' saves; it does not replay the
   scene. A door a teammate unlocked is open for you the next time you enter the room.
-- Skill effects and Toal's trail are not drawn on the other players, and a monster killed by another player just
-  disappears from your screen.
+- A teammate's skills and swings show their effects, but not sword trails, Hugo's shots and eyes, or the charge
+  glow; a monster killed by another player just disappears from your screen.
 - No lobby, no password, no encryption: play with people you know.
 
 ## How it works
@@ -58,7 +58,8 @@ messages on, so only the host has to be reachable. Twenty times a second each pl
 second the owner of a room sends its monsters (`cleria.world.snapshot`); the others hold theirs and apply it
 (`cleria.world.apply`). The owner's puppets are *targets* (`set_puppet{target = true}`): its monsters chase them and
 a hit on one raises `puppet_struck`, sent on and landed by `cleria.combat.strike`. A hit on a monster you do not
-own goes to its owner (`cleria.combat.damage`). Bosses use `cleria.world.boss` and `cleria.combat.boss_bonus`.
+own goes to its owner (`cleria.combat.damage`). Bosses use `cleria.world.boss` and `cleria.combat.boss_bonus`; skill
+effects are the `player_effect` event replayed by `cleria.world.puppet_effect`.
 
 ## Tests
 
@@ -73,6 +74,7 @@ its own script, and checks both outputs:
 | `boss` | Two Velagunders; only the host hits his; the guest's pool fills, the host's win is announced, and the guest's next hits end her fight |
 | `chat_and_follow` | A line of chat arrives; *follow* takes the guest to the host's room, where they see each other |
 | `retry` | A guest who starts before the host keeps trying and gets in |
+| `effects` | The host casts his fire skill; the guest's game shows its flames on his puppet (the picture above) |
 | `progress` | With shared progress on both sides, an item the host obtains and a door flag he sets arrive in the guest's game |
 | `tougher` | A room entered with two players connected is built with 1.6 times the HP (86 to 137), on both screens |
 | `friendly_fire` | With the rule on both sides, the host's swing on the guest's puppet hurts the guest |
