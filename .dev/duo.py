@@ -48,6 +48,7 @@ def start(side, port, tmp):
     open(os.path.join(settings, "yso_win.ini"), "w").close()
     env = dict(os.environ, CLERIA_MUTE="1", CLERIA_CHAR=side.get("char", "1"), CLERIA_DRIVE=side["drive"], CLERIA_SAVE_DIR=root,
                CLERIA_SHOT_DIR=root, CLERIA_INI=os.path.join(settings, "yso_win.ini"))
+    env.update(side.get("env", {}))
     sob = os.path.join(ASSETS, "MAP", side["room"] + ".SOB")
     return subprocess.Popen([EXE, ASSETS, sob], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
 
@@ -100,11 +101,11 @@ CASES = {
     # The two meet, each sees the other's puppet in the same room; the guest's monsters are the host's (held, the
     # same count); a hit of the guest's reaches the host's monster; the host's kill gives the guest its EXP.
     "together": dict(sides=[
-        dict(name="Hosty", auto="host", room=ROOM,
+        dict(name="Hosty", auto="host", room=ROOM, settings=["TougherMonsters=0"],
              drive="5:opt=InfiniteHP=1;" + every(1000, 9000, 1000, "lua=coop status") + ";5000:lua=coop kill;9500:quit",
              expect=[LP + "hosting on ", LP + "Guesty joined (2)", "role host id 1 peers 1 here 1 puppets 1 monsters 11 held false owner 1",
                      "monsters 10 held false owner 1"]),
-        dict(name="Guesty", auto="join", room=ROOM, char="2",
+        dict(name="Guesty", auto="join", room=ROOM, char="2", settings=["TougherMonsters=0"],
              drive="5:opt=InfiniteHP=1;" + every(1000, 9000, 1000, "lua=coop status") + ";3000:lua=coop poke;9500:quit",
              expect=[LP + "connected as 2", LP + "Hosty joined (1)", "role guest id 2 peers 1 here 1 puppets 1 monsters 11 held true owner 1",
                      LP + "shared exp ", "monsters 10 held true owner 1"]),
@@ -117,6 +118,67 @@ CASES = {
         dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009", settings=["FriendlyFire=1"],
              drive="5:opt=InfiniteHP=1;20000:quit",
              expect=[LP + "connected as 2", LP + "hit by Hosty"]),
+    ]),
+    # The host's monsters wake for the guest who walks up to them, chase her and hit her: she loses HP on her own
+    # screen, goes down instead of dying (the host stands in the room) and gets back up. (Whichever game ends first
+    # leaves the other alone with the monsters: a death after that is the rule working.)
+    "struck_and_revive": dict(sides=[
+        dict(name="Hosty", auto="host", room=ROOM, settings=["TougherMonsters=0"],
+             drive="5:opt=InfiniteHP=1;" + every(1000, 40000, 1000, "lua=coop status") + ";40000:quit",
+             expect=[LP + "Guesty joined (2)"]),
+        dict(name="Guesty", auto="join", room=ROOM, char="2", settings=["TougherMonsters=0"],
+             drive="5:opt=InfiniteHP=0;" + every(2000, 16000, 700, "lua=coop tomonster") + ";" + every(1000, 16000, 1000, "lua=coop status") + ";16000:quit",
+             expect=[LP + "connected as 2", LP + "struck by a monster of Hosty", LP + "down", LP + "revived"]),
+    ]),
+    # Alone in the room, the same fall is a real one.
+    "fall_alone": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009", drive="12000:quit", expect=[LP + "Guesty joined (2)"]),
+        dict(name="Guesty", auto="join", room=ROOM, drive="5:opt=InfiniteHP=0;3000:lua=coop fall;3400:quit",
+             expect=[LP + "connected as 2", "[death] HP 0"], absent=[LP + "down"]),
+    ]),
+    # A line of chat reaches the other player; "follow" takes the guest to the host's room, where they see each other.
+    "chat_and_follow": dict(sides=[
+        dict(name="Hosty", auto="host", room=ROOM, drive=every(1000, 12000, 1000, "lua=coop status") + ";12000:quit",
+             expect=[LP + "Guesty joined (2)", LP + "chat Guesty: hello there", "peers 1 here 1 puppets 1"]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
+             drive="3000:lua=coop say hello there;6000:lua=coop follow;" + every(8000, 40000, 2000, "lua=coop status") + ";40000:quit",
+             expect=[LP + "connected as 2", LP + "following to S_1002", "peers 1 here 1 puppets 1 monsters 11 held true owner 1"]),
+    ]),
+    # The guest starts first and finds nobody: it keeps trying and gets in when the host opens.
+    "retry": dict(sides=[
+        dict(name="Hosty", auto="", room="S_10/S_1009/S_1009", drive="4000:lua=coop host;" + every(6000, 30000, 2000, "lua=coop status") + ";30000:quit",
+             expect=[LP + "hosting on ", LP + "Guesty joined (2)"]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009", drive="40000:quit",
+             expect=[LP + "lost: Could not reach the host.", LP + "connected as 2"]),
+    ]),
+    # Each fights their own Velagunder; only the host hits his. The guest's fuller gauge puts the difference in her pool,
+    # the host's win puts all of it, and her first hits afterwards end her fight.
+    "boss": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1099/S_1099", env=dict(CLERIA_LEVEL="14"),
+             drive="5:opt=InfiniteHP=1;150:flag=156,1;" + "".join(f"{t}:boss;{t + 1}:atk;" for t in range(200, 9000, 12)) + every(2000, 9000, 1000, "lua=coop status") + ";9000:quit",
+             expect=[LP + "Guesty joined (2)"]),
+        dict(name="Guesty", auto="join", room="S_10/S_1099/S_1099", env=dict(CLERIA_LEVEL="14"),
+             drive="5:opt=InfiniteHP=1;150:flag=156,1;" + every(2000, 12000, 1000, "lua=coop status") + ";" +
+                   "".join(f"{t}:boss;{t + 1}:atk;" for t in range(7001, 12000, 12)) + "12000:quit",
+             expect=[LP + "connected as 2", "boss 100% pool true", LP + "a teammate beat the boss", LP + "boss beaten"]),
+    ]),
+    # Shared progress on both sides: an item the host obtains and a door he unlocks are the guest's too.
+    "progress": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009", settings=["ShareProgress=1"],
+             drive="6000:lua=coop give 89;8000:lua=coop door 400;30000:quit", expect=[LP + "Guesty joined (2)"]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009", settings=["ShareProgress=1"],
+             drive="1000:lua=coop flag 400;" + every(10000, 40000, 3000, "lua=coop flag 400") + ";40000:quit",
+             expect=[LP + "connected as 2", LP + "flag 400 = 0 item -1", LP + "shared item 89", LP + "shared door flag 400", LP + "flag 400 = 1 item 1"]),
+    ]),
+    # Tougher monsters: a room entered with two players in the session is built with 1.6 times the HP (86 -> 137),
+    # and the guest who comes in shows the same.
+    "tougher": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009",
+             drive="6000:lua=coop go S_1002;" + every(8000, 30000, 2000, "lua=coop status") + ";30000:quit",
+             expect=[LP + "Guesty joined (2)", "first hp 137/137 room S_1002"]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
+             drive="12000:lua=coop follow;" + every(14000, 60000, 3000, "lua=coop status") + ";60000:quit",
+             expect=[LP + "connected as 2", LP + "following to S_1002", "held true owner 1 first hp 137/137 room S_1002"]),
     ]),
     # The README's pictures: the host (Hugo) walks off and swings; the guest's screen shows him, his name, the monsters.
     "picture": dict(sides=[
