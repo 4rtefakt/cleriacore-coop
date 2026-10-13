@@ -57,13 +57,19 @@ def run(name, case):
     port = free_port()
     with tempfile.TemporaryDirectory() as tmp:
         procs = [start(s, port, tmp) for s in case["sides"]]
-        outs = []
-        for p in procs:
+        outs = [None] * len(procs)
+        order = sorted(range(len(procs)), key=lambda i: bool(case["sides"][i].get("stay")))   # the ones that stay, last
+        for i in order:
+            p = procs[i]
+            if case["sides"][i].get("stay"):                 # it has no end of its own: stopped once the others are done
+                p.kill()
+                outs[i] = p.communicate()[0]
+                continue
             try:
-                outs.append(p.communicate(timeout=600)[0])
+                outs[i] = p.communicate(timeout=600)[0]
             except subprocess.TimeoutExpired:
                 p.kill()
-                outs.append(p.communicate()[0] + "\nTIMEOUT")
+                outs[i] = p.communicate()[0] + "\nTIMEOUT"
         for side in case["sides"]:                              # {name: the tick of a `shot` command} -> .dev/shots/<name>.png
             for shot, tick in side.get("shots", {}).items():
                 f = os.path.join(tmp, side["name"], "t%d.ppm" % tick)
@@ -72,6 +78,8 @@ def run(name, case):
                     ppm_to_png(f, os.path.join(HERE, "shots", shot + ".png"))
     ok = True
     for side, out in zip(case["sides"], outs):
+        if side.get("stay"):                                  # stopped from outside: its output is cut short, not checked
+            continue
         mine = "\n".join(l for l in out.splitlines() if "[lua" in l)
         if os.environ.get("SHOW"):
             print("---- " + side["name"] + "\n" + mine)
@@ -124,8 +132,7 @@ CASES = {
     # leaves the other alone with the monsters: a death after that is the rule working.)
     "struck_and_revive": dict(sides=[
         dict(name="Hosty", auto="host", room=ROOM, settings=["TougherMonsters=0"],
-             drive="5:opt=InfiniteHP=1;" + every(1000, 40000, 1000, "lua=coop status") + ";40000:quit",
-             expect=[LP + "Guesty joined (2)"]),
+             drive="5:opt=InfiniteHP=1", stay=True, expect=[]),
         dict(name="Guesty", auto="join", room=ROOM, char="2", settings=["TougherMonsters=0"],
              drive="5:opt=InfiniteHP=0;" + every(2000, 16000, 700, "lua=coop tomonster") + ";" + every(1000, 16000, 1000, "lua=coop status") + ";16000:quit",
              expect=[LP + "connected as 2", LP + "struck by a monster of Hosty", LP + "down", LP + "revived"]),
@@ -184,8 +191,7 @@ CASES = {
     "effects": dict(sides=[
         dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009",
              drive="5:opt=InfiniteMP=1;8:bracelet=118;9:flag=118,1;10:flag=184,1;2000:move=1,0,60;" +
-                   ";".join(f"{t}:skill+;{t + 2}:skill-" for t in range(2500, 150000, 120)) + ";150000:quit",
-             expect=[LP + "Guesty joined (2)"]),
+                   ";".join(f"{t}:skill+;{t + 2}:skill-" for t in range(2500, 400000, 120)), stay=True, expect=[]),
         dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
              drive=";".join(f"{t}:shot" for t in range(2000, 12000, 37)) + ";12000:quit",
              expect=[LP + "connected as 2", LP + "effect ", " on Hosty"], shots={f"fx{t}": t for t in range(2000, 12000, 37)}),
@@ -199,6 +205,22 @@ CASES = {
         dict(name="Thirdy", auto="join", room="S_10/S_1009/S_1009", char="3",
              drive=every(3000, 40000, 3000, "lua=coop status") + ";" + every(8000, 40000, 4000, "lua=coop say hello you two") + ";40000:quit",
              expect=[LP + "connected as ", "peers 2 here 2 puppets 2"]),
+    ]),
+    # Hugo's plain attack as the other player sees it (his shots and his eyes).
+    "hugo": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009", char="2",
+             drive="2000:move=1,0,60;" + ";".join(f"{t}:atk" for t in range(2500, 400000, 25)), stay=True, expect=[]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
+             drive=";".join(f"{t}:shot" for t in range(2000, 6000, 41)) + ";" + every(2200, 6000, 300, "lua=coop status") + ";6000:quit",
+             expect=[LP + "connected as 2", LP + "bullet ", " of Hosty", " eyes 2"], shots={f"hg{t}": t for t in range(2000, 6000, 41)}),
+    ]),
+    # The host kills the room's monsters one after the other; what they drop on his screen falls on the guest's too.
+    "drops": dict(sides=[
+        dict(name="Hosty", auto="host", room=ROOM, settings=["TougherMonsters=0"],
+             drive="5:opt=InfiniteHP=1;" + every(3000, 400000, 800, "lua=coop kill"), stay=True, expect=[]),
+        dict(name="Guesty", auto="join", room=ROOM, settings=["TougherMonsters=0"],
+             drive="5:opt=InfiniteHP=1;" + every(2000, 14000, 2000, "lua=coop status") + ";14000:quit",
+             expect=[LP + "connected as 2", LP + "shared exp ", LP + "drop ", " from Hosty"]),
     ]),
     # The README's pictures: the host (Hugo) walks off and swings; the guest's screen shows him, his name, the monsters.
     "picture": dict(sides=[

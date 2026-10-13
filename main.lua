@@ -10,11 +10,13 @@
 --   dmg     a hit of mine on a monster I do not own: the owner lands it
 --   struck  the owner's monster hit your puppet on its screen: your game prices the hit
 --   kill    the owner's kill: its EXP and SP for everybody in the room
+--   drop    what that monster dropped on the owner's screen: the same pickup falls on everybody's
 --   hit     a swing of mine landed on your puppet (friendly fire)
 --   item / flag   shared progress: an item obtained, a chest / door / boss flag
 --   fx      an effect my character's script made (a skill's blast): shown on my puppet, hitting nobody
+--   b       a bullet of mine (Hugo's shots): the same bullet flies on the others' screens, hitting nobody
 --   chat    a line of text
-if not (cleria.net and cleria.net.tcp and cleria.world and cleria.world.puppet_effect and cleria.combat.boss_bonus) then
+if not (cleria.net and cleria.net.tcp and cleria.world and cleria.world.show_bullet and cleria.combat.boss_bonus) then
     cleria.log("Co-op needs a CleriaCore with mod API 7")
     return
 end
@@ -42,6 +44,7 @@ local applying = false                                 -- an item given by a mes
 local told = {}                                        -- flags I was told of: not announced back
 local down = nil                                       -- {left = seconds}: I am down, waiting for a revive
 local boss_won = nil                                   -- the room whose boss a teammate has just beaten
+local drops_seen = 0
 local chat = {}                                        -- the last lines
 local say_text = ""
 
@@ -53,7 +56,8 @@ local function players() local n = 1 for _ in pairs(peers) do n = n + 1 end retu
 
 local function drop_puppet(p)
     if p.puppet then W.remove_puppet(p.puppet) end
-    p.puppet, p.target = nil, nil
+    for _, id in ipairs(p.props or {}) do W.remove_puppet(id) end
+    p.puppet, p.target, p.props = nil, nil, nil
 end
 local function forget(id)
     local p = peers[id]
@@ -300,6 +304,12 @@ handle = function(m)
             if (m.sp or 0) > 0 then P.add_sp(m.sp) end
             say("shared exp " .. tostring(m.exp) .. " sp " .. tostring(m.sp))
         end
+    elseif t == "drop" then
+        if cfg.rewards and m.r == room() and type(m.item) == "number" and m.x then
+            G.spawn_pickup(m.item, m.x, m.y, m.z)
+            drops_seen = drops_seen + 1
+            if drops_seen == 1 then say("drop " .. m.item .. " from " .. (peers[m.from] and peers[m.from].name or "?")) end
+        end
     elseif t == "hit" then
         if cfg.friendly and in_game() and not down and (m.atk or 0) > 0 then
             cleria.combat.strike(m.atk, m.power or 0)
@@ -323,6 +333,12 @@ handle = function(m)
         if p and p.puppet and p.room == room() and type(m.e) == "table" then
             W.puppet_effect(p.puppet, m.e)
             if not p.fx_seen then p.fx_seen = true say("effect " .. tostring(m.e.id) .. " on " .. p.name) end
+        end
+    elseif t == "b" then
+        local p = peers[m.from]
+        if p and p.room == room() and in_game() and type(m.e) == "table" then
+            W.show_bullet(m.e)
+            if not p.b_seen then p.b_seen = true say("bullet " .. tostring(m.e.effect) .. " of " .. p.name) end
         end
     elseif t == "bosswon" then
         if cfg.monsters and m.r == room() then boss_won = m.r say("a teammate beat the boss") end
@@ -398,6 +414,11 @@ cleria.every(0.05, function()                           -- my room and my pose
     local m = {t = "p", r = room(), x = r2(pose.x), y = r2(pose.y), z = r2(pose.z), yaw = r2(pose.yaw), s = pose.sheet, g = pose.tag,
                f = pose.frame, c = G.character(), hp = P.hp(), mhp = P.max_hp()}
     if down then m.d = math.ceil(down.left) end
+    local fam = P.familiars()                           -- Hugo's eyes: drawn beside his puppet
+    if #fam > 0 then
+        m.e = J.array({})
+        for i, f in ipairs(fam) do m.e[i] = J.array({f.cast, r2(f.x), r2(f.y), r2(f.z), r2(f.yaw), f.tag, f.frame}) end
+    end
     local b = W.boss()
     if b and not b.actor and b.max_hp > 0 then m.bf = r2(b.hp / b.max_hp * 100) / 100 end
     send(m)
@@ -430,6 +451,12 @@ cleria.every(0.5, function()
     elseif low and mine - low > 0.01 then cleria.combat.boss_bonus((mine - low) * b.max_hp) end
 end)
 
+-- What my monster drops, the others get too: each player picks up their own copy.
+cleria.combat.add_filter("drop", function(q)
+    if role and me and cfg.rewards and q.item and q.x and others_here() > 0 and owner_of(room()) == me then
+        send({t = "drop", r = room(), item = q.item, x = r2(q.x), y = r2(q.y), z = r2(q.z)})
+    end
+end)
 cleria.events.on("enemy_killed", function(e)
     if role and me and cfg.rewards and others_here() > 0 and owner_of(room()) == me then
         send({t = "kill", r = room(), exp = e.exp, sp = e.sp})
@@ -438,6 +465,13 @@ end)
 cleria.events.on("player_effect", function(e)          -- my skill's blast, my swing's flash: the others show it on my puppet
     if role and me and others_here() > 0 then
         send({t = "fx", e = {id = e.id, fwd = r2(e.fwd), angle = r2(e.angle), voff = r2(e.voff), scale = r2(e.scale), attach = e.attach}})
+    end
+end)
+cleria.events.on("player_bullet", function(e)          -- a shot of mine: the others see it fly
+    if role and me and others_here() > 0 then
+        local m = {}
+        for k, v in pairs(e) do if type(v) == "number" then m[k] = r2(v) end end
+        send({t = "b", e = m})
     end
 end)
 cleria.events.on("puppet_struck", function(e)          -- my monster hit another player on my screen
@@ -469,7 +503,7 @@ cleria.events.on("boss_defeated", function(e)
 end)
 cleria.events.on("room_enter", function()
     held = false                                        -- a new room: its monsters are its own until a snapshot says otherwise
-    for _, p in pairs(peers) do p.puppet, p.target, p.sx = nil, nil, nil end   -- the puppets went with the old room
+    for _, p in pairs(peers) do p.puppet, p.target, p.sx, p.props = nil, nil, nil, nil end   -- the puppets went with the old room
     if role then cleria.combat.boss_bonus(0) end
     boss_won = nil
 end)
@@ -508,6 +542,16 @@ cleria.events.on("frame", function()
                     W.set_puppet(p.puppet, set)
                 end
             end
+            local eyes = m.e or {}                      -- the player's helpers, one prop each
+            p.props = p.props or {}
+            for i, f in ipairs(eyes) do
+                local set = {x = f[2], y = f[3], z = f[4], yaw = f[5], tag = f[6], frame = f[7]}
+                if not p.props[i] or not W.set_puppet(p.props[i], set) then
+                    p.props[i] = W.prop(f[1], f[2], f[3], f[4], f[5])
+                    if p.props[i] then W.set_puppet(p.props[i], set) end
+                end
+            end
+            for i = #p.props, #eyes + 1, -1 do W.remove_puppet(p.props[i]) p.props[i] = nil end
             local tgt = mine and not m.d                -- my monsters chase the players who are on their feet
             if p.puppet and p.target ~= tgt then
                 p.target = tgt
@@ -593,7 +637,7 @@ local function draw(p)
     p:section("Rules (each player's own)")
     local v, ch = p:toggle("Shared monsters and bosses", cfg.monsters, "A room's monsters are the same for everybody in it: one player's game runs them, they chase and hit every player. Bosses stay each player's own fight, but their gauges fall together. Off: everybody fights their own.")
     if ch then cfg.monsters = v keep("ShareMonsters", "monsters") if not v then release() end end
-    v, ch = p:toggle("Shared EXP and SP", cfg.rewards, "A kill in your room gives you its EXP and SP too.")
+    v, ch = p:toggle("Shared EXP, SP and drops", cfg.rewards, "A kill in your room gives you its EXP and SP too, and what the monster drops falls for every player: each picks up their own.")
     if ch then cfg.rewards = v keep("ShareRewards", "rewards") end
     v, ch = p:toggle("Revive", cfg.revive, "A hit that would kill you while a teammate stands in the room puts you down for 10 seconds instead (3 times faster with a teammate beside you). If nobody is left standing, the fall is real.")
     if ch then cfg.revive = v keep("Revive", "revive") end
@@ -663,7 +707,9 @@ cleria.command("coop", function(a)
             if p.puppet then pup = pup + 1 end
             if p.room == room() then here = here + 1 end
             if p.pose and p.pose.x then extra = string.format(" peer at %.1f%s", p.pose.x, p.pose.d and " down" or "") end
+            if p.props and #p.props > 0 then extra = extra .. " eyes " .. #p.props end
         end
+        if drops_seen > 0 then extra = extra .. " drops " .. drops_seen end
         local first, b = W.actors()[1], W.boss()
         if b and not b.actor then extra = extra .. string.format(" boss %.0f%% pool %s", b.hp / b.max_hp * 100, tostring((cleria.combat.boss_bonus() or 0) > 0)) end
         say(string.format("status role %s id %s peers %d here %d puppets %d monsters %d held %s owner %s first hp %s/%s room %s hp %d%s%s", tostring(role),

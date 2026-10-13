@@ -11,7 +11,7 @@ It needs a CleriaCore with **mod API 7**, which is not in a released build yet (
 | **You see each other** | In the same room each player is drawn with their own character, moving, jumping and attacking as on their own screen, their name and HP over them. A party list shows everybody's HP and room |
 | **Shared monsters** | A room's monsters are the same for everybody in it. They chase the nearest player and hit whoever they reach |
 | **Shared bosses** | Each player fights the boss on their own screen, but the gauges fall together, and when one player wins, the others' boss falls at their next hit |
-| **Shared EXP and SP** | A kill in your room gives you its EXP and SP too |
+| **Shared EXP, SP and drops** | A kill in your room gives you its EXP and SP too, and what the monster drops falls for every player: each picks up their own |
 | **Revive** | A hit that would kill you while a teammate stands in the room puts you down for 10 seconds instead, 3 times faster with a teammate beside you. If nobody is left standing, the fall is real |
 | **Tougher monsters** | 60 % more HP for each player beyond the first |
 | **Go to a player** | One button takes you to the room a teammate is in |
@@ -43,11 +43,11 @@ room (or use *Go to ...*), and you are together. Rooms you are not sharing are y
 - **Bosses are not shared as one fight.** The engine's boss modules cannot be copied between machines, so each
   player has their own boss with its own moves. What is shared is its health: the player whose gauge is fuller has
   the difference added to their next hits. Stand back and never hit, and your boss does not go down.
-- **Room scripts, chests, doors, switches and drops are each player's own.** *Shared progress* copies the outcome
+- **Room scripts, chests, doors and switches are each player's own.** *Shared progress* copies the outcome
   (the item, the opened chest, the unlocked door, the beaten boss) to the others' saves; it does not replay the
   scene. A door a teammate unlocked is open for you the next time you enter the room.
-- A teammate's skills and swings show their effects, but not sword trails, Hugo's shots and eyes, or the charge
-  glow.
+- A teammate's skills, swings and shots show (Hugo's eyes too), but not the charge glow or Toal's afterimages. (The
+  engine draws no sword trails for anybody: a swing is its sprite and its effects.)
 - No lobby, no password, no encryption: play with people you know.
 
 ## How it works
@@ -74,6 +74,8 @@ its own script, and checks both outputs:
 | `boss` | Two Velagunders; only the host hits his; the guest's pool fills, the host's win is announced, and the guest's next hits end her fight |
 | `chat_and_follow` | A line of chat arrives; *follow* takes the guest to the host's room, where they see each other |
 | `retry` | A guest who starts before the host keeps trying and gets in |
+| `drops` | The host kills the room's monsters; what they drop on his screen falls on the guest's too |
+| `hugo` | Hugo attacks; the guest's game shows his two eyes beside him and his shots flying |
 | `effects` | The host casts his fire skill; the guest's game shows its flames on his puppet (the picture above) |
 | `progress` | With shared progress on both sides, an item the host obtains and a door flag he sets arrive in the guest's game |
 | `tougher` | A room entered with two players connected is built with 1.6 times the HP (86 to 137), on both screens |
