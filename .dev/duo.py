@@ -222,6 +222,15 @@ CASES = {
              drive="5:opt=InfiniteHP=1;" + every(2000, 14000, 2000, "lua=coop status") + ";14000:quit",
              expect=[LP + "connected as 2", LP + "shared exp ", LP + "drop ", " from Hosty"]),
     ]),
+    # Toal boosts: the guest's game knows of his aura (and draws his demon form's afterimages behind his puppet).
+    "toal": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009", char="3",
+             drive="5:flag=187,1;" + ";".join(f"{t}:lua=coop boost;{t + 5}:boost;{t + 60}:move=1,0,40;{t + 160}:move=-1,0,40" for t in range(2000, 400000, 400)),
+             stay=True, expect=[]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
+             drive=";".join(f"{t}:shot" for t in range(2500, 6000, 37)) + ";" + every(2200, 6000, 150, "lua=coop status") + ";6000:quit",
+             expect=[LP + "connected as 2", " aura 171"], shots={f"toal{t}": t for t in range(2500, 6000, 37)}),
+    ]),
     # The README's pictures: the host (Hugo) walks off and swings; the guest's screen shows him, his name, the monsters.
     "picture": dict(sides=[
         dict(name="Hosty", auto="host", room=ROOM, char="2",

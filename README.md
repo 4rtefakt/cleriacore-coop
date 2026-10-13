@@ -46,8 +46,8 @@ room (or use *Go to ...*), and you are together. Rooms you are not sharing are y
 - **Room scripts, chests, doors and switches are each player's own.** *Shared progress* copies the outcome
   (the item, the opened chest, the unlocked door, the beaten boss) to the others' saves; it does not replay the
   scene. A door a teammate unlocked is open for you the next time you enter the room.
-- A teammate's skills, swings and shots show (Hugo's eyes too), but not the charge glow or Toal's afterimages. (The
-  engine draws no sword trails for anybody: a swing is its sprite and its effects.)
+- A teammate's skills, swings and shots show, with Hugo's eyes, the glow of a charged skill, the Boost's aura and
+  Toal's afterimages. (The engine draws no sword trails for anybody: a swing is its sprite and its effects.)
 - No lobby, no password, no encryption: play with people you know.
 
 ## How it works
@@ -76,6 +76,7 @@ its own script, and checks both outputs:
 | `retry` | A guest who starts before the host keeps trying and gets in |
 | `drops` | The host kills the room's monsters; what they drop on his screen falls on the guest's too |
 | `hugo` | Hugo attacks; the guest's game shows his two eyes beside him and his shots flying |
+| `toal` | Toal boosts; the guest's game shows his aura (and his demon form with its afterimages) |
 | `effects` | The host casts his fire skill; the guest's game shows its flames on his puppet (the picture above) |
 | `progress` | With shared progress on both sides, an item the host obtains and a door flag he sets arrive in the guest's game |
 | `tougher` | A room entered with two players connected is built with 1.6 times the HP (86 to 137), on both screens |

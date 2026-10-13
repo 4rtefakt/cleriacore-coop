@@ -414,6 +414,8 @@ cleria.every(0.05, function()                           -- my room and my pose
     local m = {t = "p", r = room(), x = r2(pose.x), y = r2(pose.y), z = r2(pose.z), yaw = r2(pose.yaw), s = pose.sheet, g = pose.tag,
                f = pose.frame, c = G.character(), hp = P.hp(), mhp = P.max_hp()}
     if down then m.d = math.ceil(down.left) end
+    if pose.glow ~= 0 then m.gl = pose.glow end         -- the charged skill's pulse
+    if pose.aura ~= 0 then m.au = pose.aura end         -- the Boost's aura
     local fam = P.familiars()                           -- Hugo's eyes: drawn beside his puppet
     if #fam > 0 then
         m.e = J.array({})
@@ -533,7 +535,7 @@ cleria.events.on("frame", function()
                 x, y, z = p.fx + (m.x - p.fx) * k, p.fy + (m.y - p.fy) * k, p.fz + (m.z - p.fz) * k
             end
             p.sx, p.sy, p.sz = x, y, z
-            local set = {x = x, y = y, z = z, yaw = m.yaw, sheet = m.s, tag = m.g, frame = m.f}
+            local set = {x = x, y = y, z = z, yaw = m.yaw, sheet = m.s, tag = m.g, frame = m.f, glow = m.gl or 0, aura = m.au or 0}
             if not p.puppet or not W.set_puppet(p.puppet, set) then
                 p.puppet = W.puppet(p.ch, x, y, z, m.yaw)
                 p.target = nil
@@ -698,6 +700,8 @@ cleria.command("coop", function(a)
         say("flag " .. rest .. " = " .. tostring(G.flag(tonumber(rest))) .. " item " .. tostring(G.flag(0x59)))
     elseif cmd == "go" then
         G.goto_room(rest)
+    elseif cmd == "boost" then                           -- (tests) a full Boost gauge
+        P.set_boost(30000)
     elseif cmd == "fall" then                            -- (tests) a hit that would kill me
         cleria.combat.strike(99999)
     else
@@ -708,6 +712,8 @@ cleria.command("coop", function(a)
             if p.room == room() then here = here + 1 end
             if p.pose and p.pose.x then extra = string.format(" peer at %.1f%s", p.pose.x, p.pose.d and " down" or "") end
             if p.props and #p.props > 0 then extra = extra .. " eyes " .. #p.props end
+            if p.pose and p.pose.au then extra = extra .. " aura " .. p.pose.au end
+            if p.pose and p.pose.gl then extra = extra .. " glow" end
         end
         if drops_seen > 0 then extra = extra .. " drops " .. drops_seen end
         local first, b = W.actors()[1], W.boss()
