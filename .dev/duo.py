@@ -78,8 +78,8 @@ def run(name, case):
                     ppm_to_png(f, os.path.join(HERE, "shots", shot + ".png"))
     ok = True
     for side, out in zip(case["sides"], outs):
-        if side.get("stay"):                                  # stopped from outside: its output is cut short, not checked
-            continue
+        if side.get("stay") and not side["expect"]:           # stopped from outside: its output is cut short; only
+            continue                                          # what it expects is checked
         mine = "\n".join(l for l in out.splitlines() if "[lua" in l)
         if os.environ.get("SHOW"):
             print("---- " + side["name"] + "\n" + mine)
@@ -181,10 +181,10 @@ CASES = {
     # and the guest who comes in shows the same.
     "tougher": dict(sides=[
         dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009",
-             drive="6000:lua=coop go S_1002;" + every(8000, 30000, 2000, "lua=coop status") + ";30000:quit",
-             expect=[LP + "Guesty joined (2)", "first hp 137/137 room S_1002"]),
+             drive="6000:lua=coop go S_1002;" + every(8000, 400000, 2000, "lua=coop status"), stay=True,   # until the guest is done:
+             expect=[LP + "Guesty joined (2)", "first hp 137/137 room S_1002"]),                     # nothing ties their ticks
         dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
-             drive="12000:lua=coop follow;" + every(14000, 60000, 3000, "lua=coop status") + ";60000:quit",
+             drive="12000:lua=coop follow;" + every(14000, 30000, 3000, "lua=coop status") + ";30000:quit",
              expect=[LP + "connected as 2", LP + "following to S_1002", "held true owner 1 first hp 137/137 room S_1002"]),
     ]),
     # The host casts his fire skill again and again; the guest's game shows the skill's effects on his puppet.
@@ -239,6 +239,16 @@ CASES = {
         dict(name="Guesty", auto="join", room=ROOM,
              drive="5:opt=InfiniteHP=1;" + ";".join(f"{t}:shot" for t in (3000, 5000, 7000)) + ";9000:quit",
              expect=[LP + "connected as 2"], shots={"guest1": 3000, "guest2": 5000, "guest3": 7000}),
+    ]),
+    # Churn: the guest leaves and joins again 25 times, then the host stops and hosts again; the two end up together.
+    # (Each leave closes a socket on both sides: a closed socket must not keep one of a mod's 16.)
+    "churn": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009",
+             drive="18000:lua=coop stop;18300:lua=coop host;" + every(21000, 30000, 1000, "lua=coop status") + ";30000:quit",
+             expect=[LP + "hosting on ", LP + "Guesty joined (2)", LP + "Guesty joined (27)", LP + "hosting on ", "role host id 1 peers 1 here 1"]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
+             drive="".join(f"{t}:lua=coop stop;{t + 300}:lua=coop join;" for t in range(1500, 16500, 600)) + every(21000, 28000, 1000, "lua=coop status") + ";28000:quit",
+             expect=[LP + "connected as 2", LP + "connected as 27", LP + "lost: The connection to the host was lost.", "role guest id 2 peers 1 here 1"]),
     ]),
     # In different rooms nobody draws anybody, and each owns its own room's monsters.
     "apart": dict(sides=[
