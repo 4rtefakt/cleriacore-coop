@@ -240,6 +240,16 @@ CASES = {
              drive="5:opt=InfiniteHP=1;" + ";".join(f"{t}:shot" for t in (3000, 5000, 7000)) + ";9000:quit",
              expect=[LP + "connected as 2"], shots={"guest1": 3000, "guest2": 5000, "guest3": 7000}),
     ]),
+    # Churn: the guest leaves and joins again 25 times, then the host stops and hosts again; the two end up together.
+    # (Each leave closes a socket on both sides: a closed socket must not keep one of a mod's 16.)
+    "churn": dict(sides=[
+        dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009",
+             drive="18000:lua=coop stop;18300:lua=coop host;" + every(21000, 30000, 1000, "lua=coop status") + ";30000:quit",
+             expect=[LP + "hosting on ", LP + "Guesty joined (2)", LP + "Guesty joined (27)", LP + "hosting on ", "role host id 1 peers 1 here 1"]),
+        dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
+             drive="".join(f"{t}:lua=coop stop;{t + 300}:lua=coop join;" for t in range(1500, 16500, 600)) + every(21000, 28000, 1000, "lua=coop status") + ";28000:quit",
+             expect=[LP + "connected as 2", LP + "connected as 27", LP + "lost: The connection to the host was lost.", "role guest id 2 peers 1 here 1"]),
+    ]),
     # In different rooms nobody draws anybody, and each owns its own room's monsters.
     "apart": dict(sides=[
         dict(name="Hosty", auto="host", room=ROOM, drive=every(500, 6000, 500, "lua=coop status") + ";6000:quit",
