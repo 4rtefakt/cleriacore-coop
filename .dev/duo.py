@@ -78,8 +78,8 @@ def run(name, case):
                     ppm_to_png(f, os.path.join(HERE, "shots", shot + ".png"))
     ok = True
     for side, out in zip(case["sides"], outs):
-        if side.get("stay"):                                  # stopped from outside: its output is cut short, not checked
-            continue
+        if side.get("stay") and not side["expect"]:           # stopped from outside: its output is cut short; only
+            continue                                          # what it expects is checked
         mine = "\n".join(l for l in out.splitlines() if "[lua" in l)
         if os.environ.get("SHOW"):
             print("---- " + side["name"] + "\n" + mine)
@@ -181,10 +181,10 @@ CASES = {
     # and the guest who comes in shows the same.
     "tougher": dict(sides=[
         dict(name="Hosty", auto="host", room="S_10/S_1009/S_1009",
-             drive="6000:lua=coop go S_1002;" + every(8000, 30000, 2000, "lua=coop status") + ";30000:quit",
-             expect=[LP + "Guesty joined (2)", "first hp 137/137 room S_1002"]),
+             drive="6000:lua=coop go S_1002;" + every(8000, 400000, 2000, "lua=coop status"), stay=True,   # until the guest is done:
+             expect=[LP + "Guesty joined (2)", "first hp 137/137 room S_1002"]),                     # nothing ties their ticks
         dict(name="Guesty", auto="join", room="S_10/S_1009/S_1009",
-             drive="12000:lua=coop follow;" + every(14000, 60000, 3000, "lua=coop status") + ";60000:quit",
+             drive="12000:lua=coop follow;" + every(14000, 30000, 3000, "lua=coop status") + ";30000:quit",
              expect=[LP + "connected as 2", LP + "following to S_1002", "held true owner 1 first hp 137/137 room S_1002"]),
     ]),
     # The host casts his fire skill again and again; the guest's game shows the skill's effects on his puppet.
