@@ -37,6 +37,8 @@ local function keep(key, field) S.set(key, cfg[field]) end
 local role, me, status = nil, nil, "Not connected"   -- role: nil, "host", "guest"
 local want = nil                                       -- "guest": keep trying to reach the host
 local listener, link, link_seen                        -- the host's listener; a guest's connection, when it last spoke
+local dialer                                           -- the guest's one socket, reused by every try: a closed socket
+                                                       -- still counts toward the mod's 16 until it is collected
 local conns, next_id = {}, 2                           -- the host's guests: {sock =, buf =, id =, seen =}
 local peers = {}                                       -- [id] = {name, ch, room, pose, puppet, ...}
 local held = false                                     -- this room's monsters are another player's: mine are held
@@ -158,7 +160,8 @@ local function host()
 end
 local function dial()
     close_all()
-    link = N.tcp()
+    dialer = dialer or N.tcp()
+    link = dialer
     link:connect(cfg.address, cfg.port)
     role, me, link_seen = "guest", nil, cleria.time()
 end
